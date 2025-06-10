@@ -3,10 +3,10 @@ name: CI
 on:
   push:
     branches:
-    - main,test
+    - test
   pull_request:
     branches:
-    - main,test
+    - test
 
   workflow_dispatch:
 
@@ -120,7 +120,6 @@ jobs:
           brew link --force bzip2
           brew link --force zstd
           brew link --force lz4
-          pip install --global-option=build_ext --global-option="-I/usr/local/include/" --global-option="-L/usr/local/lib"  bjoern
 
       - name: Install PostgreSQL
         run: |
@@ -137,7 +136,8 @@ jobs:
           cmake -DCMAKE_BUILD_TYPE=Debug .. \
             -DCMAKE_PREFIX_PATH="$HOMEBREW_PREFIX" \
             -DCMAKE_INCLUDE_PATH="$HOMEBREW_PREFIX/include" \
-            -DCMAKE_LIBRARY_PATH="$HOMEBREW_PREFIX/lib"
+            -DCMAKE_LIBRARY_PATH="$HOMEBREW_PREFIX/lib" \
+            -DCMAKE_C_FLAGS="-I$HOMEBREW_PREFIX/include" 
 
           make
 
@@ -158,7 +158,8 @@ jobs:
             -DCMAKE_C_FLAGS='-D_DARWIN_C_SOURCE' \
             -DCMAKE_PREFIX_PATH="$HOMEBREW_PREFIX" \
             -DCMAKE_INCLUDE_PATH="$HOMEBREW_PREFIX/include" \
-            -DCMAKE_LIBRARY_PATH="$HOMEBREW_PREFIX/lib"
+            -DCMAKE_LIBRARY_PATH="$HOMEBREW_PREFIX/lib" \
+            -DCMAKE_C_FLAGS="-D_DARWIN_C_SOURCE -I$HOMEBREW_PREFIX/include" 
 
           make
 
