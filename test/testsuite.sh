@@ -232,7 +232,7 @@ create_cluster() {
     fi
     chown postgres:postgres $PGCTL_LOG_FILE
     chown -R postgres:postgres "$DATA_DIRECTORY"
-    chown -R postgres:postgres $CONFIGURATION_DIRECTORY/*
+    chown -R postgres:postgres $CONFIGURATION_DIRECTORY
 
    fi
 
