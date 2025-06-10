@@ -137,7 +137,7 @@ jobs:
             -DCMAKE_PREFIX_PATH="$HOMEBREW_PREFIX" \
             -DCMAKE_INCLUDE_PATH="$HOMEBREW_PREFIX/include" \
             -DCMAKE_LIBRARY_PATH="$HOMEBREW_PREFIX/lib" \
-            -DCMAKE_C_FLAGS="-I$HOMEBREW_PREFIX/include" 
+            -DCMAKE_C_FLAGS="-D_DARWIN_C_SOURCE -I$HOMEBREW_PREFIX/include" 
 
           make
 
