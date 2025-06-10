@@ -3,10 +3,10 @@ name: CI
 on:
   push:
     branches:
-    - main
+    - main,test
   pull_request:
     branches:
-    - main
+    - main,test
 
   workflow_dispatch:
 
@@ -99,7 +99,7 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Detect Homebrew prefix
         id: brew-prefix
