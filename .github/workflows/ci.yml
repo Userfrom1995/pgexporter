@@ -20,7 +20,6 @@ jobs:
         build_type: [Debug, Release]
       fail-fast: false
 
-
     steps:
       - uses: actions/checkout@v4
 
@@ -31,13 +30,30 @@ jobs:
             libyaml-dev python3-docutils libatomic1 zlib1g zlib1g-dev \
             libzstd-dev liblz4-dev bzip2 libbz2-dev pandoc texlive-base \
             texlive-latex-recommended texlive-fonts-recommended texlive-extra-utils \
-            texlive-xetex texlive-fonts-extra wget graphviz doxygen
+            texlive-xetex texlive-fonts-extra wget graphviz doxygen \
+            check
+
+      - name: Install PostgreSQL
+        run: |
+          sudo apt install curl ca-certificates
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          sudo sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          sudo apt update
+          sudo apt install -y postgresql-17
+
+      - name: Set Env Path Variable
+        run: |
+          echo "PATH=$PATH:/usr/lib/postgresql/17/bin" >> $GITHUB_ENV
+          echo $PATH
+
       - name: Install Eisvogel template for Pandoc
         run: |
               wget https://github.com/Wandmalfarbe/pandoc-latex-template/releases/download/v3.2.0/Eisvogel-3.2.0.tar.gz
               tar -xzf Eisvogel-3.2.0.tar.gz
               mkdir -p ~/.local/share/pandoc/templates
               mv Eisvogel-3.2.0/eisvogel.latex ~/.local/share/pandoc/templates/
+
       - name: Build Project
         run: |
               mkdir build
@@ -52,6 +68,25 @@ jobs:
               make -j$(nproc)
         working-directory: /home/runner/work/pgexporter/pgexporter/
 
+      - name: Run Tests
+        run: |
+          if [ "${{ matrix.compiler }}" = "gcc" ] && [ "${{ matrix.build_type }}" = "Debug" ]; then
+            ASAN_LIB=$(gcc -print-file-name=libasan.so)
+              export ASAN_OPTIONS=verify_asan_link_order=0
+              export LD_PRELOAD=$ASAN_LIB
+              export ASAN_OPTIONS=detect_leaks=0,verify_asan_link_order=0
+          fi
+          $(which bash) ./testsuite.sh
+        working-directory: /home/runner/work/pgexporter/pgexporter/build
+
+      - name: Upload Build and Run Logs as Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-${{ matrix.compiler }}-${{ matrix.build_type }}
+          path: /home/runner/work/pgexporter/pgexporter/build/log
+          retention-days: 90
+
       - name: Upload Generated Documentation Artifact
         if: matrix.compiler == 'gcc' && matrix.build_type == 'Release'
         uses: actions/upload-artifact@v4
@@ -59,7 +94,6 @@ jobs:
           name: generated-docs
           path: /home/runner/work/pgexporter/pgexporter/build/doc
           retention-days: 90
-
 
   build-macos:
     runs-on: macos-latest
@@ -82,10 +116,15 @@ jobs:
         run: |
           brew update
           brew upgrade
-          brew install libev zstd lz4 bzip2 graphviz doxygen libyaml cmake docutils
+          brew install libev zstd lz4 bzip2 graphviz doxygen libyaml cmake docutils check pkg-config
           brew link --force bzip2
           brew link --force zstd
           brew link --force lz4
+
+      - name: Install PostgreSQL
+        run: |
+          brew install postgresql@17
+          echo "$(brew --prefix postgresql@17)/bin" >> $GITHUB_PATH
 
       - name: Debug Build
         run: |
@@ -100,6 +139,11 @@ jobs:
             -DCMAKE_LIBRARY_PATH="$HOMEBREW_PREFIX/lib"
 
           make
+
+      - name: Run Tests (Debug)
+        run: |
+          cd build
+          $(which bash) ./testsuite.sh
 
       - name: Release Build
         run: |
@@ -116,6 +160,14 @@ jobs:
             -DCMAKE_LIBRARY_PATH="$HOMEBREW_PREFIX/lib"
 
           make
+
+      - name: Upload Build Logs as Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-build-logs
+          path: build/log/
+          retention-days: 7
 
   build-freebsd:
     runs-on: ubuntu-latest
@@ -139,6 +191,7 @@ jobs:
             libvirt-clients \
             bridge-utils
           sudo systemctl start libvirtd
+
       - name: Setup FreeBSD VM
         uses: vmactions/freebsd-vm@v1
         id: freebsd-vm
@@ -161,6 +214,8 @@ jobs:
               libev \
               cmake \
               llvm11 \
+              postgresql17-server \
+              postgresql17-contrib \
               zstd \
               liblz4 \
               bzip2 \
@@ -174,7 +229,8 @@ jobs:
               hs-pandoc \
               texlive-base \
               texlive-texmf \
-              graphviz
+              graphviz \
+              pkgconf
 
       - name: Build Project
         shell: freebsd {0}
@@ -183,3 +239,19 @@ jobs:
           cd $GITHUB_WORKSPACE/build
           cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} "$GITHUB_WORKSPACE"
           make -j$(sysctl -n hw.ncpu)
+
+      - name: Run Tests
+        shell: freebsd {0}
+        run: |
+          cd ${GITHUB_WORKSPACE}/build
+          bash ./testsuite.sh
+
+      - name: Upload Build Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: freebsd-${{ matrix.compiler }}-${{ matrix.build_type }}-logs
+          path: |
+            $GITHUB_WORKSPACE/build/log/*
+            /tmp/*.log
+          retention-days: 7
