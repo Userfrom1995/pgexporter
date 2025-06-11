@@ -496,7 +496,11 @@ execute_testcases() {
    $TEST_DIRECTORY/pgexporter_test $PROJECT_DIRECTORY
    if [ $? -ne 0 ]; then
       # Kill pgexporter if tests failed
+      echo "pgexporter test failed. Printing log:"
+      cat $PGEXPORTER_LOG_FILE
+      echo "Stopping pgexporter server due to test failure..."
       pkill -f pgexporter || true
+      echo "pgexporter server stopped ... ok"
       stop_pgctl
       clean
       exit 1
@@ -504,6 +508,7 @@ execute_testcases() {
    
    pkill -f pgexporter || true
    echo "pgexporter server stopped ... ok"
+   echo "pgexporter test completed successfully"
    stop_pgctl
    set -e
    echo ""
