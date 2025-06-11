@@ -478,6 +478,8 @@ execute_testcases() {
    #    echo "ERROR: Users config file missing at execution time!"
    #    exit 1
    # fi
+   echo "Starting pgexporter server with configuration from $CONFIGURATION_DIRECTORY/pgexporter.conf"
+   echo "and users configuration from $CONFIGURATION_DIRECTORY/pgexporter_users.conf"
    
    run_as_postgres "$EXECUTABLE_DIRECTORY/pgexporter -c $CONFIGURATION_DIRECTORY/pgexporter.conf -u $CONFIGURATION_DIRECTORY/pgexporter_users.conf -d"
    if [ $? -ne 0 ]; then
