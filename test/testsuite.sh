@@ -132,7 +132,6 @@ check_pg_ctl() {
    fi
 }
 
-# FIXED: Proper error handling like pgmoneta
 stop_pgctl(){
    echo "Attempting to stop PostgreSQL..."
    set +e  # Allow failures here since server might already be stopped
@@ -413,9 +412,10 @@ EOF
    if [[ "$OS" == "FreeBSD" ]]; then
     chown -R postgres:postgres $CONFIGURATION_DIRECTORY
     chown -R postgres:postgres $PGEXPORTER_LOG_FILE
+    chmod 644 $CONFIGURATION_DIRECTORY/pgexporter_users.conf
+    chmod 644 $CONFIGURATION_DIRECTORY/pgexporter.conf
    fi
    
-   # ENHANCED: Better error handling and debugging for users config
    echo "=== DEBUG: Creating master key ==="
    run_as_postgres "$EXECUTABLE_DIRECTORY/pgexporter-admin master-key -P $PGPASSWORD"
    master_key_result=$?
@@ -426,7 +426,6 @@ EOF
    user_add_result=$?
    echo "User add result: $user_add_result"
    
-   # ENHANCED: Verify the users config file was created properly
    echo "=== DEBUG: Verifying users config file ==="
    if [[ -f "$CONFIGURATION_DIRECTORY/pgexporter_users.conf" ]]; then
       echo "Users config file exists"
@@ -463,55 +462,36 @@ execute_testcases() {
    fi
    echo "starting pgexporter server in daemon mode"
    
-   # ENHANCED: Add final verification before starting pgexporter
    echo "=== DEBUG: Final config verification before starting pgexporter ==="
    run_as_postgres "ls -la $CONFIGURATION_DIRECTORY/"
    echo "Contents of pgexporter.conf:"
    run_as_postgres "cat $CONFIGURATION_DIRECTORY/pgexporter.conf"
-   run_as_postgres "cat $CONFIGURATION_DIRECTORY/pgexporter_users.conf"
-
-   # echo "Users config file status:"
-   # if [[ -f "$CONFIGURATION_DIRECTORY/pgexporter_users.conf" ]]; then
-   #    run_as_postgres "ls -la $CONFIGURATION_DIRECTORY/pgexporter_users.conf"
-   #    run_as_postgres "wc -c $CONFIGURATION_DIRECTORY/pgexporter_users.conf"
-   # else
-   #    echo "ERROR: Users config file missing at execution time!"
-   #    exit 1
-   # fi
-   echo "Starting pgexporter server with configuration from $CONFIGURATION_DIRECTORY/pgexporter.conf"
-   echo "and users configuration from $CONFIGURATION_DIRECTORY/pgexporter_users.conf"
-   
-   run_as_postgres "$EXECUTABLE_DIRECTORY/pgexporter -c $CONFIGURATION_DIRECTORY/pgexporter.conf -u $CONFIGURATION_DIRECTORY/pgexporter_users.conf -d"
-   if [ $? -ne 0 ]; then
-      echo "pgexporter failed to start. Printing log:"
-      cat $PGEXPORTER_LOG_FILE
-      stop_pgctl
-      clean
+   echo "Users config file status:"
+   if [[ -f "$CONFIGURATION_DIRECTORY/pgexporter_users.conf" ]]; then
+      run_as_postgres "ls -la $CONFIGURATION_DIRECTORY/pgexporter_users.conf"
+      run_as_postgres "wc -c $CONFIGURATION_DIRECTORY/pgexporter_users.conf"
+   else
+      echo "ERROR: Users config file missing at execution time!"
       exit 1
    fi
-   echo "pgexporter server started ... ok"
    
-   # # Wait a moment for pgexporter to start
-   # sleep 2
-   echo "1"
+   run_as_postgres "$EXECUTABLE_DIRECTORY/pgexporter -c $CONFIGURATION_DIRECTORY/pgexporter.conf -u $CONFIGURATION_DIRECTORY/pgexporter_users.conf -d"
+   
+   # Wait a moment for pgexporter to start
+   sleep 2
+   
    ### RUN TESTCASES ###
    run_as_postgres $TEST_DIRECTORY/pgexporter_test $PROJECT_DIRECTORY
    if [ $? -ne 0 ]; then
       # Kill pgexporter if tests failed
-      echo "pgexporter test failed. Printing log:"
-      cat $PGEXPORTER_LOG_FILE
-      echo "Stopping pgexporter server due to test failure..."
       pkill -f pgexporter || true
-      echo "pgexporter server stopped ... ok"
       stop_pgctl
       clean
       exit 1
    fi
-   echo "2"
-
+   
    pkill -f pgexporter || true
    echo "pgexporter server stopped ... ok"
-   echo "pgexporter test completed successfully"
    stop_pgctl
    set -e
    echo ""
