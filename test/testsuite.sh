@@ -491,7 +491,7 @@ execute_testcases() {
    
    # # Wait a moment for pgexporter to start
    # sleep 2
-   
+   echo "1"
    ### RUN TESTCASES ###
    $TEST_DIRECTORY/pgexporter_test $PROJECT_DIRECTORY
    if [ $? -ne 0 ]; then
@@ -505,7 +505,8 @@ execute_testcases() {
       clean
       exit 1
    fi
-   
+   echo "2"
+
    pkill -f pgexporter || true
    echo "pgexporter server stopped ... ok"
    echo "pgexporter test completed successfully"
