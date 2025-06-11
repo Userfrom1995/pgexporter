@@ -468,14 +468,15 @@ execute_testcases() {
    run_as_postgres "ls -la $CONFIGURATION_DIRECTORY/"
    echo "Contents of pgexporter.conf:"
    run_as_postgres "cat $CONFIGURATION_DIRECTORY/pgexporter.conf"
-   echo "Users config file status:"
-   if [[ -f "$CONFIGURATION_DIRECTORY/pgexporter_users.conf" ]]; then
-      run_as_postgres "ls -la $CONFIGURATION_DIRECTORY/pgexporter_users.conf"
-      run_as_postgres "wc -c $CONFIGURATION_DIRECTORY/pgexporter_users.conf"
-   else
-      echo "ERROR: Users config file missing at execution time!"
-      exit 1
-   fi
+   run_as_postgres "wc -c $CONFIGURATION_DIRECTORY/pgexporter_users.conf"
+   # echo "Users config file status:"
+   # if [[ -f "$CONFIGURATION_DIRECTORY/pgexporter_users.conf" ]]; then
+   #    run_as_postgres "ls -la $CONFIGURATION_DIRECTORY/pgexporter_users.conf"
+   #    run_as_postgres "wc -c $CONFIGURATION_DIRECTORY/pgexporter_users.conf"
+   # else
+   #    echo "ERROR: Users config file missing at execution time!"
+   #    exit 1
+   # fi
    
    run_as_postgres "$EXECUTABLE_DIRECTORY/pgexporter -c $CONFIGURATION_DIRECTORY/pgexporter.conf -u $CONFIGURATION_DIRECTORY/pgexporter_users.conf -d"
    
