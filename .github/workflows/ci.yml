@@ -3,10 +3,10 @@ name: CI
 on:
   push:
     branches:
-    - test
+    - main
   pull_request:
     branches:
-    - test
+    - main
 
   workflow_dispatch:
 
@@ -99,7 +99,7 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
 
       - name: Detect Homebrew prefix
         id: brew-prefix
@@ -137,7 +137,7 @@ jobs:
             -DCMAKE_PREFIX_PATH="$HOMEBREW_PREFIX" \
             -DCMAKE_INCLUDE_PATH="$HOMEBREW_PREFIX/include" \
             -DCMAKE_LIBRARY_PATH="$HOMEBREW_PREFIX/lib" \
-            -DCMAKE_C_FLAGS="-D_DARWIN_C_SOURCE -I$HOMEBREW_PREFIX/include" 
+            -DCMAKE_C_FLAGS="-D_DARWIN_C_SOURCE -I$HOMEBREW_PREFIX/include"
 
           make
 
@@ -159,7 +159,7 @@ jobs:
             -DCMAKE_PREFIX_PATH="$HOMEBREW_PREFIX" \
             -DCMAKE_INCLUDE_PATH="$HOMEBREW_PREFIX/include" \
             -DCMAKE_LIBRARY_PATH="$HOMEBREW_PREFIX/lib" \
-            -DCMAKE_C_FLAGS="-D_DARWIN_C_SOURCE -I$HOMEBREW_PREFIX/include" 
+            -DCMAKE_C_FLAGS="-D_DARWIN_C_SOURCE -I$HOMEBREW_PREFIX/include"
 
           make
 
