@@ -387,7 +387,6 @@ clean() {
 ##############################################################
 
 #################### PGEXPORTER OPERATIONS #####################
-
 pgexporter_initialize_configuration() {
    echo -e "\e[34mInitialize pgexporter configuration files \e[0m"
    mkdir -p $CONFIGURATION_DIRECTORY
@@ -411,37 +410,21 @@ port = $PORT
 user = pgexporter
 EOF
    echo "add test configuration to pgexporter.conf ... ok"
+   if [[ "$OS" == "FreeBSD" ]]; then
+    chown -R postgres:postgres $CONFIGURATION_DIRECTORY
+    chown -R postgres:postgres $PGEXPORTER_LOG_FILE
+   fi
    
    # ENHANCED: Better error handling and debugging for users config
    echo "=== DEBUG: Creating master key ==="
-   if [[ "$OS" == "FreeBSD" ]]; then
-      # Remove the users config file first on FreeBSD to avoid permission issues
-      rm -f "$CONFIGURATION_DIRECTORY/pgexporter_users.conf"
-      su - postgres -c "$EXECUTABLE_DIRECTORY/pgexporter-admin master-key -P $PGPASSWORD"
-   else
-      "$EXECUTABLE_DIRECTORY/pgexporter-admin" master-key -P "$PGPASSWORD"
-   fi
+   run_as_postgres "$EXECUTABLE_DIRECTORY/pgexporter-admin master-key -P $PGPASSWORD"
    master_key_result=$?
    echo "Master key creation result: $master_key_result"
    
    echo "=== DEBUG: Adding user to config ==="
-   if [[ "$OS" == "FreeBSD" ]]; then
-      su - postgres -c "$EXECUTABLE_DIRECTORY/pgexporter-admin -f $CONFIGURATION_DIRECTORY/pgexporter_users.conf -U pgexporter -P $PGPASSWORD user add"
-      # Ensure proper ownership after creation
-      chown postgres:postgres "$CONFIGURATION_DIRECTORY/pgexporter_users.conf"
-      chmod 600 "$CONFIGURATION_DIRECTORY/pgexporter_users.conf"
-   else
-      "$EXECUTABLE_DIRECTORY/pgexporter-admin" -f "$CONFIGURATION_DIRECTORY/pgexporter_users.conf" -U pgexporter -P "$PGPASSWORD" user add
-   fi
+   run_as_postgres "$EXECUTABLE_DIRECTORY/pgexporter-admin -f $CONFIGURATION_DIRECTORY/pgexporter_users.conf -U pgexporter -P $PGPASSWORD user add"
    user_add_result=$?
    echo "User add result: $user_add_result"
-   
-   # Set proper ownership for all config files on FreeBSD
-   if [[ "$OS" == "FreeBSD" ]]; then
-      chown -R postgres:postgres "$CONFIGURATION_DIRECTORY"
-      chown postgres:postgres "$PGEXPORTER_LOG_FILE"
-      chmod 644 "$CONFIGURATION_DIRECTORY/pgexporter.conf"
-   fi
    
    # ENHANCED: Verify the users config file was created properly
    echo "=== DEBUG: Verifying users config file ==="
@@ -454,14 +437,6 @@ EOF
          echo "file exists but is empty"
          exit 1
       fi
-      # On FreeBSD, also verify file content is readable
-      if [[ "$OS" == "FreeBSD" ]]; then
-         echo "=== DEBUG: File content verification on FreeBSD ==="
-         su - postgres -c "cat $CONFIGURATION_DIRECTORY/pgexporter_users.conf" || {
-            echo "ERROR: Cannot read users config file as postgres user"
-            exit 1
-         }
-      fi
    else
       echo "ERROR: Users config file missing!"
       echo "Expected: $CONFIGURATION_DIRECTORY/pgexporter_users.conf"
@@ -472,7 +447,6 @@ EOF
    echo "add user pgexporter to pgexporter_users.conf file ... ok"
    echo ""
 }
-
 
 execute_testcases() {
    echo -e "\e[34mExecute Testcases \e[0m"
