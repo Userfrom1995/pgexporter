@@ -480,6 +480,14 @@ execute_testcases() {
    # fi
    
    run_as_postgres "$EXECUTABLE_DIRECTORY/pgexporter -c $CONFIGURATION_DIRECTORY/pgexporter.conf -u $CONFIGURATION_DIRECTORY/pgexporter_users.conf -d"
+   if [ $? -ne 0 ]; then
+      echo "pgexporter failed to start. Printing log:"
+      cat $PGEXPORTER_LOG_FILE
+      stop_pgctl
+      clean
+      exit 1
+   fi
+   echo "pgexporter server started ... ok"
    
    # # Wait a moment for pgexporter to start
    # sleep 2
