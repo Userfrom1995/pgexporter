@@ -469,6 +469,7 @@ execute_testcases() {
    echo "Contents of pgexporter.conf:"
    run_as_postgres "cat $CONFIGURATION_DIRECTORY/pgexporter.conf"
    run_as_postgres "cat $CONFIGURATION_DIRECTORY/pgexporter_users.conf"
+
    # echo "Users config file status:"
    # if [[ -f "$CONFIGURATION_DIRECTORY/pgexporter_users.conf" ]]; then
    #    run_as_postgres "ls -la $CONFIGURATION_DIRECTORY/pgexporter_users.conf"
@@ -478,7 +479,7 @@ execute_testcases() {
    #    exit 1
    # fi
    
-   # run_as_postgres "$EXECUTABLE_DIRECTORY/pgexporter -c $CONFIGURATION_DIRECTORY/pgexporter.conf -u $CONFIGURATION_DIRECTORY/pgexporter_users.conf -d"
+   run_as_postgres "$EXECUTABLE_DIRECTORY/pgexporter -c $CONFIGURATION_DIRECTORY/pgexporter.conf -u $CONFIGURATION_DIRECTORY/pgexporter_users.conf -d"
    
    # # Wait a moment for pgexporter to start
    # sleep 2
@@ -493,11 +494,11 @@ execute_testcases() {
    #    exit 1
    # fi
    
-   # pkill -f pgexporter || true
-   # echo "pgexporter server stopped ... ok"
-   # stop_pgctl
-   # set -e
-   # echo ""
+   pkill -f pgexporter || true
+   echo "pgexporter server stopped ... ok"
+   stop_pgctl
+   set -e
+   echo ""
 }
 
 ##############################################################
