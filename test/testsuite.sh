@@ -495,7 +495,7 @@ execute_testcases() {
    # sleep 2
    echo "1"
    ### RUN TESTCASES ###
-   $TEST_DIRECTORY/pgexporter_test $PROJECT_DIRECTORY
+   run_as_postgres $TEST_DIRECTORY/pgexporter_test $PROJECT_DIRECTORY
    if [ $? -ne 0 ]; then
       # Kill pgexporter if tests failed
       echo "pgexporter test failed. Printing log:"
