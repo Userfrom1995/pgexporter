@@ -30,6 +30,7 @@
 
 #include "testcases/pgexporter_test_1.h"
 #include "testcases/pgexporter_test_2.h"
+#include "testcases/pgexporter_test_3.h"
 
 int
 main(int argc, char* argv[])
@@ -44,6 +45,7 @@ main(int argc, char* argv[])
    int number_failed;
    Suite* s1;
    Suite* s2;
+   Suite* s3;
    SRunner* sr;
 
    if (pgexporter_tsclient_init(argv[1]))
@@ -53,11 +55,12 @@ main(int argc, char* argv[])
 
    s1 = pgexporter_test1_suite();
    s2 = pgexporter_test2_suite();
+   s3 = pgexporter_test3_suite();
 
    sr = srunner_create(s1);
    srunner_add_suite(sr, s2);
+   srunner_add_suite(sr, s3);
 
-   // Run the tests in verbose mode
    srunner_run_all(sr, CK_VERBOSE);
    number_failed = srunner_ntests_failed(sr);
    srunner_free(sr);

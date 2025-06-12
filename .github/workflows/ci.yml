@@ -3,10 +3,10 @@ name: CI
 on:
   push:
     branches:
-    - test
+    - main
   pull_request:
     branches:
-    - test
+    - main
 
   workflow_dispatch:
 
@@ -31,7 +31,7 @@ jobs:
             libzstd-dev liblz4-dev bzip2 libbz2-dev pandoc texlive-base \
             texlive-latex-recommended texlive-fonts-recommended texlive-extra-utils \
             texlive-xetex texlive-fonts-extra wget graphviz doxygen \
-            check
+            check curl
 
       - name: Install PostgreSQL
         run: |
@@ -116,7 +116,7 @@ jobs:
         run: |
           brew update
           brew upgrade
-          brew install libev zstd lz4 bzip2 graphviz doxygen libyaml cmake docutils check pkg-config
+          brew install libev zstd lz4 bzip2 graphviz doxygen libyaml cmake docutils check pkg-config curl
           brew link --force bzip2
           brew link --force zstd
           brew link --force lz4
@@ -136,8 +136,7 @@ jobs:
           cmake -DCMAKE_BUILD_TYPE=Debug .. \
             -DCMAKE_PREFIX_PATH="$HOMEBREW_PREFIX" \
             -DCMAKE_INCLUDE_PATH="$HOMEBREW_PREFIX/include" \
-            -DCMAKE_LIBRARY_PATH="$HOMEBREW_PREFIX/lib" \
-            -DCMAKE_C_FLAGS="-D_DARWIN_C_SOURCE -I$HOMEBREW_PREFIX/include"
+            -DCMAKE_LIBRARY_PATH="$HOMEBREW_PREFIX/lib"
 
           make
 
@@ -158,8 +157,7 @@ jobs:
             -DCMAKE_C_FLAGS='-D_DARWIN_C_SOURCE' \
             -DCMAKE_PREFIX_PATH="$HOMEBREW_PREFIX" \
             -DCMAKE_INCLUDE_PATH="$HOMEBREW_PREFIX/include" \
-            -DCMAKE_LIBRARY_PATH="$HOMEBREW_PREFIX/lib" \
-            -DCMAKE_C_FLAGS="-D_DARWIN_C_SOURCE -I$HOMEBREW_PREFIX/include"
+            -DCMAKE_LIBRARY_PATH="$HOMEBREW_PREFIX/lib"
 
           make
 

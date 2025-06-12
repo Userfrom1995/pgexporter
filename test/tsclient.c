@@ -31,6 +31,7 @@
 #include <pgexporter.h>
 #include <configuration.h>
 #include <extension.h>
+#include <http.h>
 #include <json.h>
 #include <logging.h>
 #include <management.h>
@@ -468,4 +469,349 @@ get_configuration_path()
    memcpy(configuration_path + project_directory_length, PGEXPORTER_CONFIGURATION_TRAIL, configuration_trail_length);
 
    return configuration_path;
+}
+
+int
+pgexporter_tsclient_test_http_metrics()
+{
+    struct http* http = NULL;
+    struct configuration* config;
+    char* response_body = NULL;
+    size_t response_size = 0;
+    char* line = NULL;
+    char* saveptr = NULL;
+    char* last_line = NULL;
+    bool found_first_metric = false;
+    bool found_version_metric = false;
+    int postgresql_version = 0;
+    int ret = 1;
+
+    config = (struct configuration*)shmem;
+
+    printf("=== Testing HTTP /metrics endpoint ===\n");
+    printf("Attempting to connect to localhost:%d\n", config->metrics);
+
+    if (pgexporter_http_connect("localhost", config->metrics, false, &http))
+    {
+        printf("ERROR: Failed to connect to HTTP endpoint localhost:%d\n", config->metrics);
+        goto error;
+    }
+    printf("Successfully connected to HTTP endpoint\n");
+
+    printf("Executing HTTP GET /metrics request\n");
+    if (pgexporter_http_get(http, "localhost", "/metrics"))
+    {
+        printf("ERROR: Failed to execute HTTP GET /metrics\n");
+        goto error;
+    }
+    printf("HTTP GET request completed\n");
+
+    if (http->body == NULL)
+    {
+        printf("ERROR: HTTP response body is NULL\n");
+        goto error;
+    }
+    printf("HTTP response body received\n");
+
+    response_body = strdup(http->body);
+    if (response_body == NULL)
+    {
+        printf("ERROR: Failed to duplicate response body\n");
+        goto error;
+    }
+
+    response_size = strlen(response_body);
+    printf("Response size: %zu bytes\n", response_size);
+
+    if (response_size == 0)
+    {
+        printf("ERROR: Response size is 0\n");
+        goto error;
+    }
+
+    printf("Parsing response for core metrics\n");
+    line = strtok_r(response_body, "\n", &saveptr);
+    while (line != NULL)
+    {
+        if (pgexporter_starts_with(line, "pgexporter_state 1"))
+        {
+            found_first_metric = true;
+            printf("Found first core metric: %s\n", line);
+        }
+
+        if (pgexporter_starts_with(line, "pgexporter_postgresql_version"))
+        {
+            char* version_start = strstr(line, "version=\"");
+            if (version_start != NULL)
+            {
+                version_start += 9;
+                char* version_end = strchr(version_start, '"');
+                if (version_end != NULL)
+                {
+                    *version_end = '\0';
+                    postgresql_version = atoi(version_start);
+                    found_version_metric = true;
+                    printf("Found PostgreSQL version metric: version=%d\n", postgresql_version);
+                    *version_end = '"';
+                }
+            }
+        }
+
+        last_line = line;
+        line = strtok_r(NULL, "\n", &saveptr);
+    }
+
+    if (last_line != NULL)
+    {
+        printf("Last line of response: %s\n", last_line);
+    }
+
+    printf("Validating metrics\n");
+    if (!found_first_metric)
+    {
+        printf("ERROR: Failed to find first core metric (pgexporter_state)\n");
+        goto error;
+    }
+
+    if (!found_version_metric)
+    {
+        printf("ERROR: Failed to find PostgreSQL version metric\n");
+        goto error;
+    }
+
+    if (postgresql_version != 17)
+    {
+        printf("ERROR: Expected PostgreSQL version 17, got %d\n", postgresql_version);
+        goto error;
+    }
+
+    printf("HTTP metrics test completed successfully\n");
+    ret = 0;
+
+error:
+    if (http != NULL)
+    {
+        pgexporter_http_disconnect(http);
+    }
+    free(response_body);
+    return ret;
+}
+
+int
+pgexporter_tsclient_test_bridge_endpoint()
+{
+   printf("DEBUG: Bridge test function entry\n");
+   fflush(stdout);
+   
+   struct http* http = NULL;
+   struct configuration* config;
+   char* response_body = NULL;
+   size_t response_size = 0;
+   char* line = NULL;
+   char* saveptr = NULL;
+   char* last_line = NULL;
+   bool found_first_metric = false;
+   bool found_version_metric = false;
+   int postgresql_version = 0;
+   int ret = 1;
+
+   printf("DEBUG: Getting config pointer\n");
+   fflush(stdout);
+   
+   config = (struct configuration*)shmem;
+   
+   if (config == NULL)
+   {
+       printf("ERROR: config is NULL\n");
+       return 1;
+   }
+   
+   printf("DEBUG: Config loaded successfully\n");
+   fflush(stdout);
+
+   printf("=== Testing bridge endpoint ===\n");
+   printf("Bridge port from config: %d\n", config->bridge);
+   
+   if (config->bridge == 0)
+   {
+       printf("ERROR: Bridge port is 0, bridge not configured\n");
+       return 1;
+   }
+   
+   printf("Attempting to connect to localhost:%d\n", config->bridge);
+
+   if (pgexporter_http_connect("localhost", config->bridge, false, &http))
+   {
+       printf("ERROR: Failed to connect to bridge endpoint localhost:%d\n", config->bridge);
+       printf("Is bridge endpoint running and configured?\n");
+       goto error;
+   }
+   printf("Successfully connected to bridge endpoint\n");
+
+   printf("Executing HTTP GET /metrics request\n");
+   if (pgexporter_http_get(http, "localhost", "/metrics"))
+   {
+       printf("ERROR: Failed to execute HTTP GET /metrics\n");
+       goto error;
+   }
+   printf("HTTP GET request completed\n");
+
+   if (http->body == NULL)
+   {
+       printf("ERROR: HTTP response body is NULL\n");
+       goto error;
+   }
+   printf("HTTP response body received\n");
+
+   response_body = strdup(http->body);
+   if (response_body == NULL)
+   {
+       printf("ERROR: Failed to duplicate response body\n");
+       goto error;
+   }
+
+   response_size = strlen(response_body);
+   printf("Response size: %zu bytes\n", response_size);
+
+   if (response_size == 0)
+   {
+       printf("ERROR: Response size is 0\n");
+       goto error;
+   }
+
+   printf("First 200 characters of response: %.200s\n", response_body);
+
+   printf("Parsing response for core metrics\n");
+   line = strtok_r(response_body, "\n", &saveptr);
+   while (line != NULL)
+   {
+       if (pgexporter_starts_with(line, "pgexporter_state{endpoint="))
+       {
+           found_first_metric = true;
+           printf("Found first core metric: %s\n", line);
+       }
+
+       if (pgexporter_starts_with(line, "pgexporter_postgresql_version{endpoint="))
+       {
+           char* version_start = strstr(line, "version=\"");
+           if (version_start != NULL)
+           {
+               version_start += 9;
+               char* version_end = strchr(version_start, '"');
+               if (version_end != NULL)
+               {
+                   *version_end = '\0';
+                   postgresql_version = atoi(version_start);
+                   found_version_metric = true;
+                   printf("Found PostgreSQL version metric: version=%d\n", postgresql_version);
+                   *version_end = '"';
+               }
+           }
+       }
+
+       last_line = line;
+       line = strtok_r(NULL, "\n", &saveptr);
+   }
+
+   if (last_line != NULL)
+   {
+       printf("Last line of response: %s\n", last_line);
+   }
+
+   printf("Validating metrics\n");
+   if (!found_first_metric)
+   {
+       printf("ERROR: Failed to find first core metric (pgexporter_state with endpoint label)\n");
+       goto error;
+   }
+   printf("First core metric validation passed\n");
+
+   if (!found_version_metric)
+   {
+       printf("ERROR: Failed to find PostgreSQL version metric with endpoint label\n");
+       goto error;
+   }
+   printf("PostgreSQL version metric found\n");
+
+   if (postgresql_version != 17)
+   {
+       printf("ERROR: Expected PostgreSQL version 17, got %d\n", postgresql_version);
+       goto error;
+   }
+   printf("PostgreSQL version validation passed\n");
+
+   printf("Bridge endpoint test completed successfully\n");
+   ret = 0;
+
+error:
+   printf("DEBUG: Bridge test cleanup\n");
+   fflush(stdout);
+   
+   if (http != NULL)
+   {
+       pgexporter_http_disconnect(http);
+   }
+   free(response_body);
+   
+   printf("DEBUG: Bridge test returning %d\n", ret);
+   fflush(stdout);
+   
+   return ret;
+}
+
+int
+pgexporter_tsclient_test_extension_detection()
+{
+    struct configuration* config;
+    bool found_pg_stat_statements = false;
+    int ret = 1;
+
+    config = (struct configuration*)shmem;
+
+    printf("=== Testing extension detection ===\n");
+    printf("Number of configured servers: %d\n", config->number_of_servers);
+
+    if (config->number_of_servers == 0)
+    {
+        printf("ERROR: No servers configured\n");
+        goto error;
+    }
+
+    printf("Checking server 0 for extensions\n");
+    printf("Number of extensions on server 0: %d\n", config->servers[0].number_of_extensions);
+
+    for (int i = 0; i < config->servers[0].number_of_extensions; i++)
+    {
+        printf("Extension %d: name='%s', enabled=%s\n", 
+               i, 
+               config->servers[0].extensions[i].name,
+               config->servers[0].extensions[i].enabled ? "true" : "false");
+        
+        if (strcmp(config->servers[0].extensions[i].name, "pg_stat_statements") == 0)
+        {
+            found_pg_stat_statements = true;
+            printf("Found pg_stat_statements extension\n");
+            
+            if (config->servers[0].extensions[i].enabled)
+            {
+                printf("pg_stat_statements is enabled\n");
+            }
+            else
+            {
+                printf("WARNING: pg_stat_statements is not enabled\n");
+            }
+        }
+    }
+
+    if (!found_pg_stat_statements)
+    {
+        printf("ERROR: pg_stat_statements extension not found\n");
+        goto error;
+    }
+
+    printf("Extension detection test completed successfully\n");
+    ret = 0;
+
+error:
+    return ret;
 }

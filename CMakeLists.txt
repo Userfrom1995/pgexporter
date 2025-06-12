@@ -64,6 +64,22 @@ if(NOT COMPILER_SUPPORTS_C17)
   message(FATAL_ERROR "The compiler ${CMAKE_C_COMPILER} has no C17 support. Please use a different C compiler.")
 endif()
 
+if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
+    set(HOMEBREW_PREFIX "/opt/homebrew")
+  else()
+    set(HOMEBREW_PREFIX "/usr/local")
+  endif()
+  
+  message(STATUS "Detected macOS with Homebrew prefix: ${HOMEBREW_PREFIX}")
+  
+  set(CMAKE_PREFIX_PATH "${HOMEBREW_PREFIX}" ${CMAKE_PREFIX_PATH})
+  include_directories("${HOMEBREW_PREFIX}/include")
+  link_directories("${HOMEBREW_PREFIX}/lib")
+  
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_DARWIN_C_SOURCE -I${HOMEBREW_PREFIX}/include")
+endif()
+
 find_package(Check)
 if (CHECK_FOUND)
   message(STATUS "check found")

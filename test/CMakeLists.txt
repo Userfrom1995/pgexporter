@@ -35,6 +35,7 @@ if (CHECK_FOUND)
     tsclient.c
     testcases/pgexporter_test_1.c
     testcases/pgexporter_test_2.c
+    testcases/pgexporter_test_3.c
     runner.c
   )
 

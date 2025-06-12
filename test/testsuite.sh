@@ -343,6 +343,13 @@ initialize_cluster() {
    else
       echo "create user pgexporter ... ok"
    fi
+   err_out=$(psql -h /tmp -p $PORT -U $PSQL_USER -d postgres -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;" 2>&1)
+   if [ $? -ne 0 ]; then
+      echo "create extension pg_stat_statements ... $err_out"
+      echo "Warning: pg_stat_statements extension not available"
+   else
+      echo "create extension pg_stat_statements ... ok"
+   fi
    err_out=$(psql -h /tmp -p $PORT -U $PSQL_USER -d postgres -c "GRANT pg_monitor TO pgexporter;" 2>&1)
    if [ $? -ne 0 ]; then
       echo "grant pg_monitor to pgexporter ... $err_out"
@@ -396,6 +403,8 @@ pgexporter_initialize_configuration() {
 [pgexporter]
 host = localhost
 metrics = 5002
+bridge = 5003
+bridge_endpoints = localhost:5002
 
 log_type = file
 log_level = debug5
@@ -412,8 +421,6 @@ EOF
    if [[ "$OS" == "FreeBSD" ]]; then
     chown -R postgres:postgres $CONFIGURATION_DIRECTORY
     chown -R postgres:postgres $PGEXPORTER_LOG_FILE
-    chmod 644 $CONFIGURATION_DIRECTORY/pgexporter_users.conf
-    chmod 644 $CONFIGURATION_DIRECTORY/pgexporter.conf
    fi
    
    echo "=== DEBUG: Creating master key ==="
@@ -444,6 +451,113 @@ EOF
    fi
    
    echo "add user pgexporter to pgexporter_users.conf file ... ok"
+   echo ""
+}
+
+test_bridge_endpoint_with_curl() {
+   echo -e "\e[34mTesting Bridge Endpoint with curl \e[0m"
+   
+   echo "=== Bridge Endpoint curl Test on $OS ==="
+   echo "Testing direct connectivity to bridge endpoint using curl"
+   
+   # Test if bridge port is listening
+   echo "Checking if bridge port 5003 is listening..."
+   if [[ "$OS" == "Linux" ]]; then
+      ss -tuln | grep :5003 || echo "Port 5003 not found in ss output"
+   elif [[ "$OS" == "Darwin" ]]; then
+      lsof -i :5003 || echo "Port 5003 not found in lsof output"
+      netstat -an | grep :5003 || echo "Port 5003 not found in netstat output"
+   elif [[ "$OS" == "FreeBSD" ]]; then
+      sockstat -l | grep :5003 || echo "Port 5003 not found in sockstat output"
+      netstat -an | grep :5003 || echo "Port 5003 not found in netstat output"
+   fi
+   
+   # Test curl connectivity to bridge endpoint
+   echo "Testing curl to bridge endpoint..."
+   set +e  # Allow curl to fail without stopping the script
+   
+   # Create a temporary file for curl output
+   CURL_OUTPUT_FILE="$LOG_DIRECTORY/bridge_curl_output.txt"
+   
+   # Check if timeout command exists (not available on macOS by default)
+   if command -v timeout >/dev/null 2>&1; then
+      timeout 15 curl -v --connect-timeout 10 --max-time 30 http://localhost:5003/metrics > "$CURL_OUTPUT_FILE" 2>&1
+      CURL_EXIT_CODE=$?
+   else
+      # macOS and other systems without timeout - use curl's built-in timeouts
+      curl -v --connect-timeout 10 --max-time 30 http://localhost:5003/metrics > "$CURL_OUTPUT_FILE" 2>&1
+      CURL_EXIT_CODE=$?
+   fi
+   
+   echo "Curl exit code: $CURL_EXIT_CODE"
+   echo "=== Curl output ==="
+   cat "$CURL_OUTPUT_FILE"
+   echo "=== End curl output ==="
+   
+   # Check response content
+   if [ $CURL_EXIT_CODE -eq 0 ]; then
+      echo "SUCCESS: curl connected to bridge endpoint on $OS"
+      echo "Response size: $(wc -c < "$CURL_OUTPUT_FILE") bytes"
+      echo "Response lines: $(wc -l < "$CURL_OUTPUT_FILE") lines"
+      
+      # Check for expected content
+      if grep -q "pgexporter_state" "$CURL_OUTPUT_FILE"; then
+         echo "SUCCESS: Found expected pgexporter_state metric in bridge response"
+      else
+         echo "WARNING: pgexporter_state metric not found in bridge response"
+         echo "First 500 chars of bridge response:"
+         head -c 500 "$CURL_OUTPUT_FILE"
+      fi
+      
+      # Check for endpoint-specific metrics (bridge format)
+      if grep -q "endpoint=" "$CURL_OUTPUT_FILE"; then
+         echo "SUCCESS: Found endpoint labels in bridge response (expected bridge format)"
+      else
+         echo "WARNING: No endpoint labels found - may not be bridge format"
+      fi
+   else
+      echo "ERROR: curl failed to connect to bridge endpoint on $OS (exit code: $CURL_EXIT_CODE)"
+      
+      # Test if main metrics endpoint works as fallback
+      echo "Testing if main metrics endpoint works..."
+      MAIN_CURL_OUTPUT_FILE="$LOG_DIRECTORY/main_curl_output.txt"
+      
+      # Use same timeout handling for main endpoint
+      if command -v timeout >/dev/null 2>&1; then
+         timeout 10 curl -v --connect-timeout 5 --max-time 15 http://localhost:5002/metrics > "$MAIN_CURL_OUTPUT_FILE" 2>&1
+         MAIN_CURL_EXIT_CODE=$?
+      else
+         curl -v --connect-timeout 5 --max-time 15 http://localhost:5002/metrics > "$MAIN_CURL_OUTPUT_FILE" 2>&1
+         MAIN_CURL_EXIT_CODE=$?
+      fi
+      echo "Main endpoint curl exit code: $MAIN_CURL_EXIT_CODE"
+      
+      if [ $MAIN_CURL_EXIT_CODE -eq 0 ]; then
+         echo "SUCCESS: Main metrics endpoint works"
+         echo "Main response size: $(wc -c < "$MAIN_CURL_OUTPUT_FILE") bytes"
+         if grep -q "pgexporter_state" "$MAIN_CURL_OUTPUT_FILE"; then
+            echo "SUCCESS: Found pgexporter_state in main endpoint"
+         fi
+      else
+         echo "ERROR: Main metrics endpoint also failed"
+         echo "Main endpoint curl output:"
+         cat "$MAIN_CURL_OUTPUT_FILE" 2>/dev/null || echo "No main response file"
+      fi
+   fi
+   
+   # Show process status
+   echo "=== Process status ==="
+   ps aux | grep pgexporter | grep -v grep || echo "No pgexporter processes found"
+   
+   # Show system info
+   echo "=== System info ==="
+   echo "OS: $OS"
+   uname -a
+   if [[ "$OS" == "FreeBSD" ]]; then
+      freebsd-version 2>/dev/null || echo "FreeBSD version not available"
+   fi
+   
+   set -e  # Re-enable exit on error
    echo ""
 }
 
@@ -478,7 +592,10 @@ execute_testcases() {
    run_as_postgres "$EXECUTABLE_DIRECTORY/pgexporter -c $CONFIGURATION_DIRECTORY/pgexporter.conf -u $CONFIGURATION_DIRECTORY/pgexporter_users.conf -d"
    
    # Wait a moment for pgexporter to start
-   sleep 2
+   sleep 3
+   
+   # Test bridge endpoint with curl before running unit tests
+   test_bridge_endpoint_with_curl
    
    ### RUN TESTCASES ###
    run_as_postgres $TEST_DIRECTORY/pgexporter_test $PROJECT_DIRECTORY

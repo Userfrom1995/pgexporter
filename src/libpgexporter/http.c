@@ -229,7 +229,11 @@ res:
          // Get data from the response message
          if (msg_response != NULL && msg_response->data != NULL)
          {
-            response = pgexporter_append(response, (char*)msg_response->data);
+            char* temp = malloc(msg_response->length + 1); // 1 for the '\0'
+            memcpy(temp, msg_response->data, msg_response->length);
+            temp[msg_response->length] = '\0';
+            response = pgexporter_append(response, temp);
+            free(temp);
          }
          pgexporter_clear_message();
          goto res;
@@ -913,6 +917,8 @@ pgexporter_http_disconnect(struct http* http)
          http->request_headers = NULL;
       }
    }
+
+   free(http);
 
    if (status != 0)
    {
