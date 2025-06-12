@@ -229,19 +229,32 @@ pgexporter_has_message(char type, void* data, size_t data_size)
 
    offset = 0;
 
+   if (data == NULL || data_size < 5)
+   {
+      return false;
+   }
+
    while (offset < data_size)
    {
-      char t = (char)pgexporter_read_byte(data + offset);
+      if (offset + 5 > data_size)
+      {
+         break;
+      }
 
-      if (type == t)
+      char msg_type = pgexporter_read_byte(data + offset);
+      int32_t msg_length = pgexporter_read_int32(data + offset + 1);
+
+      if (msg_type == type)
       {
-         return true;
+         // Check if the full message is available
+         if (offset + 1 + msg_length <= data_size)
+         {
+            return true; // Found the message type
+         }
       }
-      else
-      {
-         offset += 1;
-         offset += pgexporter_read_int32(data + offset);
-      }
+
+      // Move to next message
+      offset += 1 + msg_length;
    }
 
    return false;

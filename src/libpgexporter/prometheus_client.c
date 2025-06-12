@@ -701,7 +701,7 @@ add_line(struct prometheus_metric* metric, char* line, int endpoint, time_t time
 
    config = (struct configuration*)shmem;
 
-   if (line == NULL)
+    if (line == NULL || strlen(line) == 0 || metric == NULL)
    {
       goto error;
    }
