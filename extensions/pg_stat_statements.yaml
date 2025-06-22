@@ -93,15 +93,6 @@ metrics:
             description: Bytes occupied in WAL
           - name: query
             type: label
-    queries:
-      - query: SELECT wal_bytes, query FROM pg_stat_statements ORDER BY wal_bytes DESC LIMIT 10;
-        version: "1.8"
-        columns:
-          - name: wal_bytes
-            type: gauge
-            description: Bytes occupied in WAL
-          - name: query
-            type: label
 
   # Planning statistics with detailed metrics - query optimization insights
   - metric: planning_stats
