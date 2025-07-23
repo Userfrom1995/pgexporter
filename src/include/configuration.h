@@ -36,6 +36,19 @@ extern "C" {
 #include <json.h>
 
 #include <stdlib.h>
+#include <stdbool.h>
+
+/**
+ * Configuration key information structure
+ */
+struct config_key_info
+{
+   char section[MISC_LENGTH];     /**< Section name (e.g., "pgexporter", "server") */
+   char context[MISC_LENGTH];     /**< Context name (e.g., server name for server section) */
+   char key[MISC_LENGTH];         /**< Configuration key name */
+   int section_type;              /**< 0 = main, 1 = server */
+   bool is_main_section;          /**< True if this is the main pgexporter section */
+};
 
 #define PGEXPORTER_MAIN_INI_SECTION                       "pgexporter"
 #define PGEXPORTER_CONF_SERVER_PREFIX                     "server"
@@ -61,6 +74,7 @@ extern "C" {
 #define CONFIGURATION_ARGUMENT_LOG_LINE_PREFIX            "log_line_prefix"
 #define CONFIGURATION_ARGUMENT_LOG_MODE                   "log_mode"
 #define CONFIGURATION_ARGUMENT_BLOCKING_TIMEOUT           "blocking_timeout"
+#define CONFIGURATION_ARGUMENT_AUTHENTICATION_TIMEOUT   "authentication_timeout"
 #define CONFIGURATION_ARGUMENT_TLS                        "tls"
 #define CONFIGURATION_ARGUMENT_TLS_CERT_FILE              "tls_cert_file"
 #define CONFIGURATION_ARGUMENT_TLS_KEY_FILE               "tls_key_file"
@@ -94,6 +108,16 @@ extern "C" {
 #define PGEXPORTER_CONF_FILENAME                          "pgexporter.conf"
 #define PGEXPORTER_USERS_FILENAME                         "pgexporter_users.conf"
 #define PGEXPORTER_ADMINS_FILENAME                        "pgexporter_admins.conf"
+
+#define CONFIGURATION_SERVER_SECTION                      "server"
+#define CONFIGURATION_SERVER_ARGUMENT_HOST                "server_host"
+#define CONFIGURATION_SERVER_ARGUMENT_PORT                "server_port"
+#define CONFIGURATION_SERVER_ARGUMENT_USER                "server_user"
+#define CONFIGURATION_SERVER_ARGUMENT_DATA_DIR            "server_data_dir"
+#define CONFIGURATION_SERVER_ARGUMENT_WAL_DIR             "server_wal_dir"
+#define CONFIGURATION_SERVER_ARGUMENT_TLS_CERT_FILE      "server_tls_cert_file"
+#define CONFIGURATION_SERVER_ARGUMENT_TLS_KEY_FILE       "server_tls_key_file"
+#define CONFIGURATION_SERVER_ARGUMENT_TLS_CA_FILE        "server_tls_ca_file"
 
 /**
  * Initialize the configuration structure
@@ -180,9 +204,11 @@ pgexporter_conf_get(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryp
  * @param compression The compress method for wire protocol
  * @param encryption The encrypt method for wire protocol
  * @param payload The payload
+ * @param restart_required Pointer to bool indicating if restart is required
+ * @return 0 on success, 1 on error
  */
-void
-pgexporter_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload);
+int
+pgexporter_conf_set(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload, bool* restart_required);
 
 #ifdef __cplusplus
 }

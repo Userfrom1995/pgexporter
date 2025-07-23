@@ -79,6 +79,7 @@
 #endif
 
 #define MAX_FDS 64
+#define SIGNALS_NUMBER 6
 
 static void accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents);
 static void accept_transfer_cb(struct ev_loop* loop, struct ev_io* watcher, int revents);
@@ -91,6 +92,9 @@ static void reload_cb(struct ev_loop* loop, ev_signal* w, int revents);
 static void coredump_cb(struct ev_loop* loop, ev_signal* w, int revents);
 static bool accept_fatal(int error);
 static bool reload_configuration(void);
+static void service_reload_cb(struct ev_loop* loop, ev_signal* w, int revents);
+static void reload_set_configuration(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload);
+static bool reload_services_only(void);
 static int  create_pidfile(void);
 static void remove_pidfile(void);
 static int  create_lockfile(int port);
@@ -387,7 +391,7 @@ main(int argc, char** argv)
    char collectors[NUMBER_OF_COLLECTORS][MAX_COLLECTOR_LENGTH];
    bool daemon = false;
    pid_t pid, sid;
-   struct signal_info signal_watcher[5];
+   struct signal_info signal_watcher[SIGNALS_NUMBER];
    size_t shmem_size;
    size_t prometheus_cache_shmem_size = 0;
    size_t bridge_cache_shmem_size = 0;
@@ -975,8 +979,10 @@ main(int argc, char** argv)
    ev_signal_init((struct ev_signal*)&signal_watcher[2], shutdown_cb, SIGINT);
    ev_signal_init((struct ev_signal*)&signal_watcher[3], coredump_cb, SIGABRT);
    ev_signal_init((struct ev_signal*)&signal_watcher[4], shutdown_cb, SIGALRM);
+   ev_signal_init((struct ev_signal*)&signal_watcher[5], service_reload_cb, SIGUSR1);
 
-   for (int i = 0; i < 5; i++)
+
+   for (int i = 0; i < SIGNALS_NUMBER; i++)
    {
       signal_watcher[i].slot = -1;
       ev_signal_start(main_loop, (struct ev_signal*)&signal_watcher[i]);
@@ -1431,12 +1437,10 @@ accept_mgt_cb(struct ev_loop* loop, struct ev_io* watcher, int revents)
       {
          struct json* pyl = NULL;
 
-         shutdown_ports();
-
          pgexporter_json_clone(payload, &pyl);
 
          pgexporter_set_proc_title(1, ai->argv, "conf set", NULL);
-         pgexporter_conf_set(NULL, client_fd, compression, encryption, pyl);
+         reload_set_configuration(NULL, client_fd, compression, encryption, pyl);
       }
    }
    else
@@ -2017,6 +2021,119 @@ reload_configuration(void)
    }
 
    return restart;
+}
+
+static void
+reload_set_configuration(SSL* ssl, int client_fd, uint8_t compression, uint8_t encryption, struct json* payload)
+{
+   bool restart_required = false;
+
+   // Apply configuration changes to shared memory
+   if (pgexporter_conf_set(ssl, client_fd, compression, encryption, payload, &restart_required))
+   {
+      pgexporter_log_error("Error applying configuration changes");
+      exit(1);
+   }
+
+   pgexporter_log_debug("pgexporter: configuration changes applied successfully");
+
+   // Only restart services if config change succeeded AND no restart required
+   if (restart_required)
+   {
+      pgexporter_log_info("Configuration requires restart - continuing with old configuration");
+   }
+   else
+   {
+      pgexporter_log_info("Configuration applied successfully, reloading services");
+      kill(getppid(), SIGUSR1);
+   }
+
+   exit(0);
+}
+
+static bool
+reload_services_only(void)
+{
+   struct configuration* config;
+
+   config = (struct configuration*)shmem;
+
+   shutdown_metrics();
+
+   free(metrics_fds);
+   metrics_fds = NULL;
+   metrics_fds_length = 0;
+
+   if (config->metrics > 0)
+   {
+      /* Bind metrics socket */
+      if (pgexporter_bind(config->host, config->metrics, &metrics_fds, &metrics_fds_length))
+      {
+         pgexporter_log_fatal("Could not bind to %s:%d", config->host, config->metrics);
+         goto error;
+      }
+
+      if (metrics_fds_length > MAX_FDS)
+      {
+         pgexporter_log_fatal("Too many descriptors %d", metrics_fds_length);
+         goto error;
+      }
+
+      start_metrics();
+
+      for (int i = 0; i < metrics_fds_length; i++)
+      {
+         pgexporter_log_debug("Metrics: %d", *(metrics_fds + i));
+      }
+   }
+
+   shutdown_management();
+
+   free(management_fds);
+   management_fds = NULL;
+   management_fds_length = 0;
+
+   if (config->management > 0)
+   {
+      /* Bind management socket */
+      if (pgexporter_bind(config->host, config->management, &management_fds, &management_fds_length))
+      {
+         pgexporter_log_fatal("Could not bind to %s:%d", config->host, config->management);
+         goto error;
+      }
+
+      if (management_fds_length > MAX_FDS)
+      {
+         pgexporter_log_fatal("Too many descriptors %d", management_fds_length);
+         goto error;
+      }
+
+      start_management();
+
+      for (int i = 0; i < management_fds_length; i++)
+      {
+         pgexporter_log_debug("Remote management: %d", *(management_fds + i));
+      }
+   }
+
+   return true;
+
+error:
+   return false;
+}
+
+static void
+service_reload_cb(struct ev_loop* loop, ev_signal* w, int revents)
+{
+   pgexporter_log_debug("pgexporter: service restart requested (%p, %p, %d)", loop, w, revents);
+   if(reload_services_only())
+   {
+      pgexporter_log_info("pgmoneta: Services reloaded successfully");
+   }
+   else
+   {
+      pgexporter_log_error("pgmoneta: Error reloading services");
+   }
 }
 
 static int

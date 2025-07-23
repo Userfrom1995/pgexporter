@@ -142,6 +142,26 @@ extern "C" {
 #define MANAGEMENT_ERROR_CONF_SET_ERROR                     1107
 
 /**
+ * Configuration response constants
+ */
+#define CONFIGURATION_RESPONSE_STATUS           "status"
+#define CONFIGURATION_RESPONSE_MESSAGE          "message"
+#define CONFIGURATION_RESPONSE_CONFIG_KEY       "config_key"
+#define CONFIGURATION_RESPONSE_OLD_VALUE        "old_value"
+#define CONFIGURATION_RESPONSE_NEW_VALUE        "new_value"
+#define CONFIGURATION_RESPONSE_CURRENT_VALUE    "current_value"
+#define CONFIGURATION_RESPONSE_REQUESTED_VALUE  "requested_value"
+#define CONFIGURATION_RESPONSE_RESTART_REQUIRED "restart_required"
+
+#define CONFIGURATION_STATUS_SUCCESS           "success"
+#define CONFIGURATION_STATUS_RESTART_REQUIRED  "restart_required"
+
+#define CONFIGURATION_MESSAGE_SUCCESS          "Configuration applied successfully"
+#define CONFIGURATION_MESSAGE_RESTART_REQUIRED "Configuration change requires restart"
+
+#define PGEXPORTER_MAIN_INI_SECTION "pgexporter"
+
+/**
  * Output formats
  */
 #define MANAGEMENT_OUTPUT_FORMAT_TEXT 0
