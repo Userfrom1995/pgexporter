@@ -668,6 +668,8 @@ query_execute(int server, char* qs, char* tag, int columns, char* names[], struc
       }
       else
       {
+         pgexporter_log_warn("Query '%s' on server '%s' failed to read response (status=%d), likely broken pipe or network issue",
+                             tag, config->servers[server].name, status);
          goto error;
       }
 
@@ -768,9 +770,13 @@ error:
    // Disconnect on error to allow recovery
    if (config->servers[server].fd != -1)
    {
+      pgexporter_log_warn("Query '%s' failed on server '%s', disconnecting to allow reconnection on next attempt",
+                          tag, config->servers[server].name);
       pgexporter_disconnect(config->servers[server].fd);
       config->servers[server].fd = -1;
       config->servers[server].state = SERVER_UNKNOWN;
+      pgexporter_log_debug("Server '%s' marked as UNKNOWN, will reconnect before next query",
+                           config->servers[server].name);
    }
 
    return 1;
