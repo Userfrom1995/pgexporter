@@ -620,9 +620,34 @@ query_execute(int server, char* qs, char* tag, int columns, char* names[], struc
    qmsg.length = size;
    qmsg.data = content;
 
+   // Validate connection before query execution
+   // The fd might be closed by PostgreSQL due to timeout, network issues, or server load
+   if (config->servers[server].fd == -1 || 
+       !pgexporter_socket_isvalid(config->servers[server].fd))
+   {
+      pgexporter_log_debug("Connection to server '%s' is invalid, attempting to reconnect", 
+                           config->servers[server].name);
+      
+      if (config->servers[server].fd != -1)
+      {
+         pgexporter_disconnect(config->servers[server].fd);
+         config->servers[server].fd = -1;
+      }
+      
+      if (pgexporter_connect_db(server, NULL) != 0)
+      {
+         pgexporter_log_error("Failed to reconnect to server '%s'", config->servers[server].name);
+         goto error;
+      }
+      
+      pgexporter_log_info("Successfully reconnected to server '%s'", config->servers[server].name);
+   }
+
    status = pgexporter_write_message(config->servers[server].ssl, config->servers[server].fd, &qmsg);
    if (status != MESSAGE_STATUS_OK)
    {
+      pgexporter_log_warn("Failed to write query to server '%s', marking connection as invalid", 
+                          config->servers[server].name);
       goto error;
    }
 
@@ -739,6 +764,14 @@ error:
    pgexporter_free_message(tmsg);
    free(content);
    free(data);
+
+   // Disconnect on error to allow recovery
+   if (config->servers[server].fd != -1)
+   {
+      pgexporter_disconnect(config->servers[server].fd);
+      config->servers[server].fd = -1;
+      config->servers[server].state = SERVER_UNKNOWN;
+   }
 
    return 1;
 }
