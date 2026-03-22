@@ -210,10 +210,14 @@ pgexporter_prometheus(SSL* client_ssl, int client_fd)
    struct message* msg = NULL;
    struct configuration* config;
 
+   pgexporter_log_trace("pgexporter_prometheus: client_fd %d", client_fd);
    pgexporter_start_logging();
+   pgexporter_log_trace("pgexporter_prometheus: logging started");
    pgexporter_memory_init();
+   pgexporter_log_trace("pgexporter_prometheus: memory initialized");
 
    config = (struct configuration*)shmem;
+   pgexporter_log_trace("pgexporter_prometheus: config accessed");
    if (client_ssl)
    {
       char buffer[5] = {0};

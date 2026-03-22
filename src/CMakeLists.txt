@@ -61,12 +61,23 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     add_compile_options(-DHAVE_EXECINFO_H)
   endif()
 
+  # Add io_uring compile flag if available
+  if (HAVE_IO_URING AND HAVE_IO_URING_CONSTANTS)
+    add_compile_options(-DHAVE_IO_URING)
+    include_directories(${LIBURING_INCLUDE_DIRS})
+  endif ()
+
+  # Add epoll_pwait2 compile flag if available
+  if (HAVE_EPOLL_PWAIT2)
+    add_compile_options(-DHAVE_EPOLL_PWAIT2)
+  endif ()
+
   #
   # Include directories
   #
   include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${LIBEV_INCLUDE_DIRS}
+    ${LIBURING_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIR}
     ${LIBYAML_INCLUDE_DIRS}
     ${THREAD_INCLUDE_DIRS}
@@ -93,7 +104,6 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
   # Library directories
   #
   link_libraries(
-    ${LIBEV_LIBRARIES}
     ${OPENSSL_CRYPTO_LIBRARY}
     ${OPENSSL_SSL_LIBRARY}
     ${LIBYAML_LIBRARIES}
@@ -104,6 +114,11 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     ${ZSTD_LIBRARIES}
     ${LZ4_LIBRARIES}
   )
+
+  # Link liburing only if available and constants are present
+  if (HAVE_IO_URING AND HAVE_IO_URING_CONSTANTS)
+    link_libraries(${LIBURING_LIBRARIES})
+  endif ()
 
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--no-undefined")
 
@@ -116,10 +131,14 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
   add_compile_options(-D_DEFAULT_SOURCE)
   add_compile_options(-D__BSD_VISIBLE)
 
+  # Add kqueue compile flag if available
+  if (HAVE_KQUEUE)
+    add_compile_options(-DHAVE_KQUEUE)
+  endif ()
+
   # Include directories
   include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${LIBEV_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIR}
     ${LIBYAML_INCLUDE_DIRS}
     ${THREAD_INCLUDE_DIRS}
@@ -143,7 +162,6 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
 
   # Library directories
   link_libraries(
-    ${LIBEV_LIBRARIES}
     ${OPENSSL_CRYPTO_LIBRARY}
     ${OPENSSL_SSL_LIBRARY}
     ${LIBYAML_LIBRARIES}
@@ -161,12 +179,16 @@ else()
   add_compile_options(-D_DEFAULT_SOURCE)
   add_compile_options(-D__BSD_VISIBLE)
 
+  # Add kqueue compile flag if available
+  if (HAVE_KQUEUE)
+    add_compile_options(-DHAVE_KQUEUE)
+  endif ()
+
   #
   # Include directories
   #
   include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${LIBEV_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIR}
     ${LIBYAML_INCLUDE_DIRS}
     ${THREAD_INCLUDE_DIRS}
@@ -192,7 +214,6 @@ else()
   # Library directories
   #
   link_libraries(
-    ${LIBEV_LIBRARIES}
     ${OPENSSL_CRYPTO_LIBRARY}
     ${OPENSSL_SSL_LIBRARY}
     ${LIBYAML_LIBRARIES}

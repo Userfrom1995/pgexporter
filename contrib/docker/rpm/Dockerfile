@@ -18,6 +18,7 @@ RUN microdnf install --enablerepo=crb -y \
     libyaml-devel \
     lz4 \
     systemd-devel
+RUN microdnf install --enablerepo=crb -y check-devel zlib-devel bzip2-devel lz4-devel liburing-devel pkgconf libatomic openssl-devel python3-docutils doxygen libyaml-devel lz4 systemd-devel
 RUN microdnf clean all && rm -rf /var/cache/yum
 WORKDIR /root
 RUN rpmdev-setuptree

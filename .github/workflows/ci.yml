@@ -4,9 +4,11 @@ on:
   push:
     branches:
     - main
+    - io_layer
   pull_request:
     branches:
     - main
+    - io_layer
 
   workflow_dispatch:
 
@@ -77,7 +79,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt update && sudo apt install -y \
-            git gcc cmake make libev-dev openssl libssl-dev systemd libsystemd-dev \
+            git gcc cmake make liburing-dev pkg-config openssl libssl-dev systemd libsystemd-dev \
             libyaml-dev python3-docutils libatomic1 zlib1g zlib1g-dev \
             libzstd-dev liblz4-dev bzip2 libbz2-dev pandoc texlive-base \
             texlive-latex-recommended texlive-fonts-recommended texlive-extra-utils \
@@ -196,7 +198,6 @@ jobs:
         run: |
           brew update
           brew install \
-            libev \
             libyaml \
             docutils \
             check \

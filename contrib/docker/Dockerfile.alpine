@@ -44,7 +44,8 @@ RUN apk add --no-cache \
     libpq \
     libpq-dev \
     musl-dev \
-    libev-dev \
+    liburing-dev \
+    pkgconf \
     py-docutils \
     pandoc \
     texlive texmf-dist \
@@ -72,7 +73,7 @@ RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/main" >> /etc/apk/repositori
     postgresql17-client \
     bash \
     ca-certificates \
-    libev \
+    liburing \
     yaml \
     bzip2 \
     bzip2-dev \

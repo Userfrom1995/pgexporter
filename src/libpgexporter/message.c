@@ -40,10 +40,14 @@
 #include <unistd.h>
 #include <openssl/err.h>
 #include <openssl/ssl.h>
+#include <shmem.h>
 #include <sys/time.h>
 
 static int read_message(int socket, bool block, int timeout, struct message** msg);
 static int write_message(int socket, struct message* msg);
+
+static int read_message_from_buffer(struct io_watcher* watcher, struct message** msg);
+static int write_message_from_buffer(struct io_watcher* watcher, struct message* msg);
 
 static int ssl_read_message(SSL* ssl, int timeout, struct message** msg);
 static int ssl_write_message(SSL* ssl, struct message* msg);
@@ -950,4 +954,100 @@ ssl_write_message(SSL* ssl, struct message* msg)
    while (keep_write);
 
    return MESSAGE_STATUS_ERROR;
+}
+
+/**
+ * Get the message buffer from a watcher
+ * @param watcher The I/O watcher
+ * @return The message buffer
+ */
+struct message*
+pgexporter_get_watcher_message(struct io_watcher* watcher)
+{
+   if (watcher != NULL && watcher->msg != NULL)
+   {
+      return watcher->msg;
+   }
+
+   return pgexporter_memory_message();
+}
+
+int
+pgexporter_recv_message(struct io_watcher* watcher, struct message** msg)
+{
+   struct configuration* config = (struct configuration*)shmem;
+   int rfd = watcher->fds.worker.rcv_fd;
+
+   /* For SSL, we still use traditional read_message as io_uring/epoll
+    * don't support SSL-layer asynchronicity directly without OSSL_RW_WANT */
+   if (watcher->ssl)
+   {
+      /* XXX: We need a way to get the SSL object from the watcher.
+       * For now, this is a placeholder as pgexporter doesn't yet store
+       * SSL in io_watcher. Traditional flow is used in prometheus.c. */
+      return read_message(rfd, false, 0, msg);
+   }
+
+   if (config->ev_backend != PGEXPORTER_EVENT_BACKEND_IO_URING)
+   {
+      return read_message(rfd, false, 0, msg);
+   }
+
+   return read_message_from_buffer(watcher, msg);
+}
+
+int
+pgexporter_send_message(struct io_watcher* watcher, struct message* msg)
+{
+   struct configuration* config = (struct configuration*)shmem;
+   int sfd = watcher->fds.worker.snd_fd;
+
+   if (watcher->ssl)
+   {
+      /* XXX: Placeholder for SSL support in watcher */
+      return write_message(sfd, msg);
+   }
+
+   if (config->ev_backend != PGEXPORTER_EVENT_BACKEND_IO_URING)
+   {
+      return write_message(sfd, msg);
+   }
+
+   return write_message_from_buffer(watcher, msg);
+}
+
+static int
+read_message_from_buffer(struct io_watcher* watcher, struct message** msg_p)
+{
+   struct message* msg = pgexporter_get_watcher_message(watcher);
+
+   if (msg->length == 0)
+   {
+      return MESSAGE_STATUS_ZERO;
+   }
+
+   if (msg->length < 0)
+   {
+      return MESSAGE_STATUS_ERROR;
+   }
+
+   msg->kind = (signed char)(*((char*)msg->data));
+   *msg_p = msg;
+   return MESSAGE_STATUS_OK;
+}
+
+static int
+write_message_from_buffer(struct io_watcher* watcher, struct message* msg)
+{
+   int sent_bytes = pgexporter_io_send(watcher, msg);
+
+   if (msg->length == 0)
+   {
+      return MESSAGE_STATUS_ZERO;
+   }
+   if (sent_bytes < msg->length)
+   {
+      return MESSAGE_STATUS_ERROR;
+   }
+   return MESSAGE_STATUS_OK;
 }

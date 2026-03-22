@@ -16,4 +16,8 @@ __pycache__/
 *.pyd
 .Python
 
+pgagroal/
+target/
 .idea/
+.specstory/
+build*
