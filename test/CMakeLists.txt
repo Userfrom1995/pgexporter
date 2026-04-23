@@ -38,6 +38,7 @@ set(TESTCASE_FILES
   testcases/test_http.c
   testcases/test_alert.c
   testcases/test_art.c
+  testcases/test_deque.c
 )
 set(SOURCE_FILES ${LIB_SOURCE_FILES} ${TESTCASE_FILES} ${HEADER_FILES})
 
