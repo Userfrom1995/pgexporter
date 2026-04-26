@@ -355,7 +355,7 @@ MCTF_TEST(test_deque_sort)
       MCTF_ASSERT(!pgexporter_deque_add(dq, tag, index[i], ValueInt32), cleanup, "add failed");
    }
 
-   pgexporter_deque_sort(dq);
+   pgexporter_deque_sort(dq, NULL);
 
    MCTF_ASSERT(!pgexporter_deque_iterator_create(dq, &iter), cleanup, "iterator creation failed");
 
@@ -366,6 +366,82 @@ MCTF_TEST(test_deque_sort)
       MCTF_ASSERT_STR_EQ(iter->tag, tag, cleanup, "sorted tag mismatch");
       cnt++;
    }
+
+cleanup:
+   pgexporter_deque_iterator_destroy(iter);
+   pgexporter_deque_destroy(dq);
+   pgexporter_test_teardown();
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_deque_custom_sort_values)
+{
+   struct deque* dq = NULL;
+   struct deque_iterator* iter = NULL;
+   int cnt = 0;
+
+   int index[6] = {2, 1, 3, 5, 4, 0};
+
+   pgexporter_test_setup();
+
+   MCTF_ASSERT(!pgexporter_deque_create(false, &dq), cleanup, "custom deque creation failed");
+
+   for (int i = 0; i < 6; i++)
+   {
+      MCTF_ASSERT(!pgexporter_deque_add(dq, NULL, index[i], ValueInt32), cleanup, "add failed");
+   }
+
+   pgexporter_deque_sort(dq, pgexporter_value_compare);
+
+   MCTF_ASSERT(!pgexporter_deque_iterator_create(dq, &iter), cleanup, "iterator creation failed");
+
+   while (pgexporter_deque_iterator_next(iter))
+   {
+      MCTF_ASSERT_INT_EQ(pgexporter_value_data(iter->value), cnt, cleanup, "sorted value mismatch");
+      cnt++;
+   }
+
+cleanup:
+   pgexporter_deque_iterator_destroy(iter);
+   pgexporter_deque_destroy(dq);
+   pgexporter_test_teardown();
+   MCTF_FINISH();
+}
+
+MCTF_TEST(test_deque_sort_mixed_and_edge_cases)
+{
+   struct deque* dq = NULL;
+   struct deque_iterator* iter = NULL;
+
+   pgexporter_test_setup();
+
+   MCTF_ASSERT(!pgexporter_deque_create(false, &dq), cleanup, "custom deque creation failed");
+
+   pgexporter_deque_add(dq, "tag1", (uintptr_t)100, ValueInt32);
+   pgexporter_deque_add(dq, "tag2", (uintptr_t)"zebra", ValueString);
+   pgexporter_deque_add(dq, "tag3", (uintptr_t)5, ValueInt32);
+   pgexporter_deque_add(dq, "tag4", (uintptr_t)"apple", ValueString);
+
+   pgexporter_deque_add(dq, NULL, (uintptr_t)50, ValueInt32);
+
+   pgexporter_deque_sort(dq, pgexporter_value_compare);
+
+   MCTF_ASSERT(!pgexporter_deque_iterator_create(dq, &iter), cleanup, "iterator creation failed");
+
+   pgexporter_deque_iterator_next(iter);
+   MCTF_ASSERT_INT_EQ(pgexporter_value_data(iter->value), 5, cleanup, "Mixed sort failed: expected 5");
+
+   pgexporter_deque_iterator_next(iter);
+   MCTF_ASSERT_INT_EQ(pgexporter_value_data(iter->value), 50, cleanup, "Mixed sort failed: expected 50");
+
+   pgexporter_deque_iterator_next(iter);
+   MCTF_ASSERT_INT_EQ(pgexporter_value_data(iter->value), 100, cleanup, "Mixed sort failed: expected 100");
+
+   pgexporter_deque_iterator_next(iter);
+   MCTF_ASSERT_STR_EQ((char*)pgexporter_value_data(iter->value), "apple", cleanup, "Mixed sort failed: expected apple");
+
+   pgexporter_deque_iterator_next(iter);
+   MCTF_ASSERT_STR_EQ((char*)pgexporter_value_data(iter->value), "zebra", cleanup, "Mixed sort failed: expected zebra");
 
 cleanup:
    pgexporter_deque_iterator_destroy(iter);

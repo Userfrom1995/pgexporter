@@ -102,6 +102,16 @@ int
 pgexporter_value_create(enum value_type type, uintptr_t data, struct value** value);
 
 /**
+ * Compare two values. Returns 0 if equal, <0 if a<b, >0 if a>b.
+ * NULLs sort before non-NULLs. Type mismatches compare by type ordinal.
+ * @param a The first value
+ * @param b The second value
+ * @return Comparison result
+ */
+int
+pgexporter_value_compare(struct value* a, struct value* b);
+
+/**
  * Create a value with a config for customized destroy or to_string callback,
  * the type will default to ValueRef
  * @param data The value data, type cast it to uintptr_t before passing into function
@@ -189,6 +199,15 @@ pgexporter_value_to_ref(enum value_type type);
  */
 char*
 pgexporter_value_type_to_string(enum value_type type);
+
+/**
+ * Compare two values based on their type
+ * @param a The first value
+ * @param b The second value
+ * @return -1 if a < b, 0 if a == b, 1 if a > b
+ */
+int
+pgmoneta_value_compare(struct value* a, struct value* b);
 
 #ifdef __cplusplus
 }
