@@ -103,6 +103,7 @@ static int to_log_type(char* where, int value);
 static int to_log_level(char* where, int value);
 static int to_log_mode(char* where, int value);
 static int to_server_tls_mode(char* where, int value);
+static int to_ev_backend(char* where, int value);
 static int to_hugepage(char* where, int value);
 static int to_update_process_title(char* where, int value);
 static bool pgexporter_is_binary_file(const char* path);
@@ -146,6 +147,8 @@ pgexporter_init_configuration(void* shm)
    config->non_blocking = true;
    config->backlog = 16;
    config->hugepage = HUGEPAGE_TRY;
+   config->keep_running = true;
+   config->ev_backend = PGEXPORTER_EVENT_BACKEND_AUTO;
 
    config->update_process_title = UPDATE_PROCESS_TITLE_VERBOSE;
 
@@ -938,16 +941,32 @@ pgexporter_read_configuration(void* shm, char* filename)
                      unknown = true;
                   }
                }
-               else if (!strcmp(key, "libev"))
+               else if (!strcmp(key, "ev_backend"))
                {
                   if (!strcmp(section, "pgexporter"))
                   {
-                     max = strlen(value);
-                     if (max > MISC_LENGTH - 1)
+                     // Parse ev_backend value
+                     if (strcmp(value, "auto") == 0)
                      {
-                        max = MISC_LENGTH - 1;
+                        config->ev_backend = PGEXPORTER_EVENT_BACKEND_AUTO;
                      }
-                     memcpy(config->libev, value, max);
+                     else if (strcmp(value, "io_uring") == 0)
+                     {
+                        config->ev_backend = PGEXPORTER_EVENT_BACKEND_IO_URING;
+                     }
+                     else if (strcmp(value, "epoll") == 0)
+                     {
+                        config->ev_backend = PGEXPORTER_EVENT_BACKEND_EPOLL;
+                     }
+                     else if (strcmp(value, "kqueue") == 0)
+                     {
+                        config->ev_backend = PGEXPORTER_EVENT_BACKEND_KQUEUE;
+                     }
+                     else
+                     {
+                        // Default to auto if unknown value
+                        config->ev_backend = PGEXPORTER_EVENT_BACKEND_AUTO;
+                     }
                   }
                   else
                   {
@@ -2516,15 +2535,30 @@ pgexporter_conf_set(SSL* ssl __attribute__((unused)), int client_fd, uint8_t com
          memcpy(config->unix_socket_dir, config_value, max);
          pgexporter_json_put(response, key, (uintptr_t)config->unix_socket_dir, ValueString);
       }
-      else if (!strcmp(key, "libev"))
+      else if (!strcmp(key, "ev_backend"))
       {
-         max = strlen(config_value);
-         if (max > MISC_LENGTH - 1)
+         // Parse ev_backend value
+         if (strcmp(config_value, "auto") == 0)
          {
-            max = MISC_LENGTH - 1;
+            config->ev_backend = PGEXPORTER_EVENT_BACKEND_AUTO;
          }
-         memcpy(config->libev, config_value, max);
-         pgexporter_json_put(response, key, (uintptr_t)config->libev, ValueString);
+         else if (strcmp(config_value, "io_uring") == 0)
+         {
+            config->ev_backend = PGEXPORTER_EVENT_BACKEND_IO_URING;
+         }
+         else if (strcmp(config_value, "epoll") == 0)
+         {
+            config->ev_backend = PGEXPORTER_EVENT_BACKEND_EPOLL;
+         }
+         else if (strcmp(config_value, "kqueue") == 0)
+         {
+            config->ev_backend = PGEXPORTER_EVENT_BACKEND_KQUEUE;
+         }
+         else
+         {
+            config->ev_backend = PGEXPORTER_EVENT_BACKEND_AUTO;
+         }
+         pgexporter_json_put(response, key, (uintptr_t)config->ev_backend, ValueInt32);
       }
       else if (!strcmp(key, "keep_alive"))
       {
@@ -2707,7 +2741,7 @@ add_configuration_response(struct json* res)
    pgexporter_json_put(res, CONFIGURATION_ARGUMENT_METRICS_CERT_FILE, (uintptr_t)config->metrics_cert_file, ValueString);
    pgexporter_json_put(res, CONFIGURATION_ARGUMENT_METRICS_CA_FILE, (uintptr_t)config->metrics_ca_file, ValueString);
    pgexporter_json_put(res, CONFIGURATION_ARGUMENT_METRICS_KEY_FILE, (uintptr_t)config->metrics_key_file, ValueString);
-   pgexporter_json_put(res, CONFIGURATION_ARGUMENT_LIBEV, (uintptr_t)config->libev, ValueString);
+   pgexporter_json_put_enum_value(res, CONFIGURATION_ARGUMENT_EV_BACKEND, config->ev_backend, to_ev_backend);
    pgexporter_json_put(res, CONFIGURATION_ARGUMENT_KEEP_ALIVE, (uintptr_t)config->keep_alive, ValueBool);
    pgexporter_json_put(res, CONFIGURATION_ARGUMENT_NODELAY, (uintptr_t)config->nodelay, ValueBool);
    pgexporter_json_put(res, CONFIGURATION_ARGUMENT_NON_BLOCKING, (uintptr_t)config->non_blocking, ValueBool);
@@ -3767,8 +3801,11 @@ transfer_configuration(struct configuration* config, struct configuration* reloa
       changed = true;
    }
 
-   /* libev */
-   restart_string("libev", config->libev, reload->libev);
+   /* ev_backend */
+   if (restart_int("ev_backend", config->ev_backend, reload->ev_backend))
+   {
+      changed = true;
+   }
    config->keep_alive = reload->keep_alive;
    config->nodelay = reload->nodelay;
    config->non_blocking = reload->non_blocking;
@@ -4117,6 +4154,33 @@ to_log_mode(char* where, int value)
          break;
       case PGEXPORTER_LOGGING_MODE_APPEND:
          snprintf(where, MISC_LENGTH, "%s", "append");
+         break;
+      default:
+         return 1;
+   }
+   return 0;
+}
+
+static int
+to_ev_backend(char* where, int value)
+{
+   if (!where)
+   {
+      return 1;
+   }
+   switch (value)
+   {
+      case PGEXPORTER_EVENT_BACKEND_AUTO:
+         snprintf(where, MISC_LENGTH, "%s", "auto");
+         break;
+      case PGEXPORTER_EVENT_BACKEND_IO_URING:
+         snprintf(where, MISC_LENGTH, "%s", "io_uring");
+         break;
+      case PGEXPORTER_EVENT_BACKEND_EPOLL:
+         snprintf(where, MISC_LENGTH, "%s", "epoll");
+         break;
+      case PGEXPORTER_EVENT_BACKEND_KQUEUE:
+         snprintf(where, MISC_LENGTH, "%s", "kqueue");
          break;
       default:
          return 1;
