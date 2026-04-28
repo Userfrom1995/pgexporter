@@ -3909,83 +3909,113 @@ SSL connection status for database connections
 
 ## pgexporter_pg_statio_all_tables_heap_blks_read
 
-Aggregates `heap_blks_read` from `pg_statio_all_tables`: total disk blocks read for all table heaps in the database.
+Disk blocks read from the heap for this table, from `pg_statio_all_tables`.
 
 | Attribute | Description |
 | :-------- | :---------- |
 | server | The configured name/identifier for the PostgreSQL server. |
+| database | The name of the database. |
+| schemaname | The name of the schema the table belongs to. |
+| relname | The name of the table. |
 
 ## pgexporter_pg_statio_all_tables_heap_blks_hit
 
-Aggregates `heap_blks_hit` from `pg_statio_all_tables`: total buffer cache hits for all table heaps in the database.
+Buffer cache hits for the heap of this table, from `pg_statio_all_tables`.
 
 | Attribute | Description |
 | :-------- | :---------- |
 | server | The configured name/identifier for the PostgreSQL server. |
+| database | The name of the database. |
+| schemaname | The name of the schema the table belongs to. |
+| relname | The name of the table. |
 
 ## pgexporter_pg_statio_all_tables_idx_blks_read
 
-Aggregates `idx_blks_read` from `pg_statio_all_tables`: total disk blocks read for all table indexes in the database.
+Disk blocks read from all indexes on this table, from `pg_statio_all_tables`.
 
 | Attribute | Description |
 | :-------- | :---------- |
 | server | The configured name/identifier for the PostgreSQL server. |
+| database | The name of the database. |
+| schemaname | The name of the schema the table belongs to. |
+| relname | The name of the table. |
 
 ## pgexporter_pg_statio_all_tables_idx_blks_hit
 
-Aggregates `idx_blks_hit` from `pg_statio_all_tables`: total buffer cache hits for all table indexes in the database.
+Buffer cache hits for all indexes on this table, from `pg_statio_all_tables`.
 
 | Attribute | Description |
 | :-------- | :---------- |
 | server | The configured name/identifier for the PostgreSQL server. |
+| database | The name of the database. |
+| schemaname | The name of the schema the table belongs to. |
+| relname | The name of the table. |
 
 ## pgexporter_pg_statio_all_tables_toast_blks_read
 
-Aggregates `toast_blks_read` from `pg_statio_all_tables`: total disk blocks read for all TOAST tables in the database.
+Disk blocks read from the TOAST table for this relation, from `pg_statio_all_tables`.
 
 | Attribute | Description |
 | :-------- | :---------- |
 | server | The configured name/identifier for the PostgreSQL server. |
+| database | The name of the database. |
+| schemaname | The name of the schema the table belongs to. |
+| relname | The name of the table. |
 
 ## pgexporter_pg_statio_all_tables_toast_blks_hit
 
-Aggregates `toast_blks_hit` from `pg_statio_all_tables`: total buffer cache hits for all TOAST tables in the database.
+Buffer cache hits for the TOAST table of this relation, from `pg_statio_all_tables`.
 
 | Attribute | Description |
 | :-------- | :---------- |
 | server | The configured name/identifier for the PostgreSQL server. |
+| database | The name of the database. |
+| schemaname | The name of the schema the table belongs to. |
+| relname | The name of the table. |
 
 ## pgexporter_pg_statio_all_tables_tidx_blks_read
 
-Aggregates `tidx_blks_read` from `pg_statio_all_tables`: total disk blocks read for all TOAST table indexes in the database.
+Disk blocks read from the TOAST table indexes for this relation, from `pg_statio_all_tables`.
 
 | Attribute | Description |
 | :-------- | :---------- |
 | server | The configured name/identifier for the PostgreSQL server. |
+| database | The name of the database. |
+| schemaname | The name of the schema the table belongs to. |
+| relname | The name of the table. |
 
 ## pgexporter_pg_statio_all_tables_tidx_blks_hit
 
-Aggregates `tidx_blks_hit` from `pg_statio_all_tables`: total buffer cache hits for all TOAST table indexes in the database.
+Buffer cache hits for the TOAST table indexes of this relation, from `pg_statio_all_tables`.
 
 | Attribute | Description |
 | :-------- | :---------- |
 | server | The configured name/identifier for the PostgreSQL server. |
+| database | The name of the database. |
+| schemaname | The name of the schema the table belongs to. |
+| relname | The name of the table. |
 
 ## pgexporter_pg_statio_all_sequences_blks_read
 
-Aggregates `blks_read` from `pg_statio_all_sequences`: total disk blocks read for all sequences in the database.
+Disk blocks read from this sequence, from `pg_statio_all_sequences`.
 
 | Attribute | Description |
 | :-------- | :---------- |
 | server | The configured name/identifier for the PostgreSQL server. |
+| database | The name of the database. |
+| schemaname | The name of the schema the sequence belongs to. |
+| relname | The name of the sequence. |
 
 ## pgexporter_pg_statio_all_sequences_blks_hit
 
-Aggregates `blks_hit` from `pg_statio_all_sequences`: total buffer cache hits for all sequences in the database.
+Buffer cache hits for this sequence, from `pg_statio_all_sequences`.
 
 | Attribute | Description |
 | :-------- | :---------- |
 | server | The configured name/identifier for the PostgreSQL server. |
+| database | The name of the database. |
+| schemaname | The name of the schema the sequence belongs to. |
+| relname | The name of the sequence. |
 
 ## pgexporter_pg_stat_user_functions_calls
 
